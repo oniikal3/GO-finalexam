@@ -15,5 +15,5 @@ func (h *Handler) PostHandler(c *gin.Context) {
 	}
 	row := database.InsertCustomer(h.DB, cus.Name, cus.Email, cus.Status)
 	row.Scan(&cus.ID, &cus.Name, &cus.Email, &cus.Status)
-	c.JSON(http.StatusOK, cus)
+	c.JSON(http.StatusCreated, cus)
 }

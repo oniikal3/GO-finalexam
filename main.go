@@ -2,41 +2,59 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 	"github.com/oniikal3/finalexam/customers"
+	"github.com/oniikal3/finalexam/database"
 )
 
 func main() {
-	r := setupRouter()
+	h := setupEnv()
+	r := setupRouter(h)
+	defer h.DB.Close()
 	r.Run(getPort())
 }
 
 func authMiddleware(c *gin.Context) {
-	// token := c.GetHeader("Authorization")
+	token := c.GetHeader("Authorization")
+	if token != "token2019" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": http.StatusText(http.StatusUnauthorized),
+		})
+		c.AbortWithError(http.StatusUnauthorized, errors.New("Unauthorized: invalid token"))
+		return
+	}
 	c.Next()
 }
 
-func setupRouter() *gin.Engine {
+func setupEnv() *customers.Handler {
+	db := startConnection()
+	handler := &customers.Handler{
+		DB: db,
+	}
+	err := database.CreateCustomersTable(db)
+	if err != nil {
+		panic(err)
+	}
+	return handler
+}
+
+func setupRouter(h *customers.Handler) *gin.Engine {
 	r := gin.Default()
 	r.Use(authMiddleware)
-	handler := customers.Handler{
-		DB: startConnection(),
-	}
-	err := handler.CreateCustomersTable()
-	if err != nil {
-		// return error
-	}
 	c := r.Group("/customers")
 	{
-		c.GET("/:id", handler.GetByIdHandler)
-		c.GET("/", handler.GetAllHandler)
-		c.POST("/", handler.PostHandler)
-		c.PUT("/:id", handler.PutByIdHandler)
-		c.DELETE("/:id", handler.DeleteByIdHandler)
+		c.GET("/:id", h.GetByIdHandler)
+		c.GET("/", h.GetAllHandler)
+		c.POST("/", h.PostHandler)
+		c.PUT("/:id", h.PutByIdHandler)
+		c.DELETE("/:id", h.DeleteByIdHandler)
 	}
 	return r
 }
